@@ -1,46 +1,88 @@
-# Puppet command for task 0
-exec { 'Update bash':
-  command  => 'sudo apt-get -y update',
-  provider => shell
+# AirBnB clone web server setup and configuration
+
+# SCRIPT INCOMPLETE. NEEDS SOME MORE THINKING---
+$nginx_conf = "server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    add_header X-Served-By ${hostname};
+    root   /var/www/html;
+    index  index.html index.htm;
+    location /hbnb_static {
+        alias /data/web_static/current;
+        index index.html index.htm;
+    }
+    location /redirect_me {
+        return 301 http://linktr.ee/firdaus_h_salim/;
+    }
+    error_page 404 /404.html;
+    location /404 {
+      root /var/www/html;
+      internal;
+    }
+}"
+
+package { 'nginx':
+  ensure   => 'present',
+  provider => 'apt'
 }
-exec { 'Install NGINX':
-  command  => 'sudo apt-get -y install nginx',
-  provider => shell,
-  require  => Exec['Update bash']
+
+-> file { '/data':
+  ensure  => 'directory'
 }
-exec { 'Create shared path':
-  command  => 'sudo mkdir -p /data/web_static/shared/',
-  provider => shell,
-  require  => Exec['Install NGINX']
+
+-> file { '/data/web_static':
+  ensure => 'directory'
 }
-exec { 'Create test path':
-  command  => 'sudo mkdir -p /data/web_static/releases/test/',
-  provider => shell,
-  require  => Exec['Create shared path']
+
+-> file { '/data/web_static/releases':
+  ensure => 'directory'
 }
-exec { 'Adding fake HTML':
-  command  => 'echo "FakeHTML" | sudo tee /data/web_static/releases/test/index.html',
-  provider => shell,
-  require  => Exec['Create test path'],
-  returns  => [0, 1]
+
+-> file { '/data/web_static/releases/test':
+  ensure => 'directory'
 }
-exec { 'Symbolic link':
-  command  => 'sudo ln -sf /data/web_static/releases/test/ /data/web_static/current',
-  provider => shell,
-  require  => Exec['Adding fake HTML']
+
+-> file { '/data/web_static/shared':
+  ensure => 'directory'
 }
-exec { 'Permissions':
-  command  => 'sudo chown -R ubuntu:ubuntu /data/',
-  provider => shell,
-  require  => Exec['Symbolic link']
+
+-> file { '/data/web_static/releases/test/index.html':
+  ensure  => 'present',
+  content => "this webpage is found in data/web_static/releases/test/index.htm \n"
 }
-exec { 'Adding location':
-  command  => 'sudo sed -i "29i\\\n\tlocation \/hbnb_static\/ {\n\t\talias \/data\/web_static\/current\/;\n\t\tautoindex off;\n\t}" /etc/nginx/sites-available/default',
-  provider => shell,
-  require  => Exec['Permissions']
+
+-> file { '/data/web_static/current':
+  ensure => 'link',
+  target => '/data/web_static/releases/test'
 }
-exec { 'Restart nginx':
-  command  => 'sudo service nginx restart',
-  provider => shell,
-  require  => Exec['Adding location']
+
+-> exec { 'chown -R ubuntu:ubuntu /data/':
+  path => '/usr/bin/:/usr/local/bin/:/bin/'
+}
+
+file { '/var/www':
+  ensure => 'directory'
+}
+
+-> file { '/var/www/html':
+  ensure => 'directory'
+}
+
+-> file { '/var/www/html/index.html':
+  ensure  => 'present',
+  content => "This is my first upload  in /var/www/index.html***\n"
+}
+
+-> file { '/var/www/html/404.html':
+  ensure  => 'present',
+  content => "Ceci n'est pas une page - Error page\n"
+}
+
+-> file { '/etc/nginx/sites-available/default':
+  ensure  => 'present',
+  content => $nginx_conf
+}
+
+-> exec { 'nginx restart':
+  path => '/etc/init.d/'
 }
